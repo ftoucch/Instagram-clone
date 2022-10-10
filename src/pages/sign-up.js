@@ -2,32 +2,52 @@ import React, { useContext, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import FirebaseContext from "../context/firebase";
 import * as ROUTES from "../constants/routes";
-const Login = () => {
+import { doesUsernameExist } from "../services/firebase";
+const SignUp = () => {
   const navigate = useNavigate();
   const { firebase } = useContext(FirebaseContext);
 
   const [emailAddress, setEmailAddress] = useState("");
-
+  const [username, setUserName] = useState("");
+  const [fullname, setFullName] = useState("");
   const [password, setPassword] = useState("");
-
   const [error, setError] = useState("");
 
   const isInvalid = password === "" || emailAddress === "";
 
-  const handleLogin = async (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
+    const usernameExists = await doesUsernameExist(username);
+    if (usernameExists) {
+      setError("That username exist please try another");
+    } else {
+      try {
+        const createdUserResult = await firebase
+          .auth()
+          .createUserWithEmailAndPassword(emailAddress, password);
+        await createdUserResult.user.updateProfile({
+          displayName: username,
+        });
 
-    try {
-      await firebase.auth().signInWithEmailAndPassword(emailAddress, password);
-      navigate(ROUTES.DASHBOARD);
-    } catch (error) {
-      setEmailAddress("");
-      setPassword("");
-      setError(error.message);
+        await firebase.firestore().collection("users").add({
+          userId: createdUserResult.user.uid,
+          username: username.toLowerCase(),
+          fullname,
+          emailAddress: emailAddress.toLowerCase(),
+          following: [],
+          dateCreated: Date.now(),
+        });
+        navigate(ROUTES.DASHBOARD);
+      } catch (error) {
+        setFullName("");
+        setEmailAddress("");
+        setPassword(" ");
+        setError(error.message);
+      }
     }
   };
   useEffect(() => {
-    document.title = "Login - Instagram";
+    document.title = "Sign up - Instagram";
   }, []);
 
   return (
@@ -51,7 +71,21 @@ const Login = () => {
             <p className="mt-4 text-xs text-red-primary mb-4">{error}</p>
           )}
 
-          <form onSubmit={handleLogin} method="POST">
+          <form onSubmit={handleSignup} method="POST">
+            <input
+              aria-label="Enter your username"
+              type="text"
+              placeholder="Username"
+              className="text-sm text-grey-base w-full mr-3 py-5 px-4 h-2 border border-gray-primary rounded mb-2"
+              onChange={(e) => setUserName(e.target.value)}
+            />
+            <input
+              aria-label="Enter your full name"
+              type="text"
+              placeholder="Full name"
+              className="text-sm text-grey-base w-full mr-3 py-5 px-4 h-2 border border-gray-primary rounded mb-2"
+              onChange={(e) => setFullName(e.target.value)}
+            />
             <input
               aria-label="Enter your email address"
               type="text"
@@ -73,15 +107,15 @@ const Login = () => {
                 isInvalid && "opacity-50"
               }`}
             >
-              Log In
+              Sign Up
             </button>
           </form>
         </div>
         <div className="flex rounded justify-center items-center flex-col w-full bg-white p-4 border border-gray-primary">
           <p className="text-sm">
-            Don&apos;t have an account ? {` `}
-            <Link to={ROUTES.SIGNUP} className="font-bold text-blue-medium">
-              Signup
+            Have an account ? {` `}
+            <Link to={ROUTES.LOGIN} className="font-bold text-blue-medium">
+              Login
             </Link>
           </p>
         </div>
@@ -90,8 +124,4 @@ const Login = () => {
   );
 };
 
-// text-red-primary
-// text-grey-base
-// border-grey-primary
-
-export default Login;
+export default SignUp;
